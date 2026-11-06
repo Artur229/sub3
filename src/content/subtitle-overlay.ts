@@ -1,5 +1,4 @@
-import type { ExtensionSettings, SubtitleCue, TranslationResult, WordDetails, WordInsight } from '../shared/types';
-import { addDictionaryEntry } from '../dictionary/dictionary-store';
+import type { ExtensionSettings, SubtitleCue, WordDetails, WordInsight } from '../shared/types';
 import { cachedTranslation, isQuotaProvider, quickTranslate, translate } from '../translation/translation-manager';
 
 const wordPattern = /[\p{L}\p{M}]+(?:['’\-][\p{L}\p{M}]+)*/gu;
@@ -282,7 +281,6 @@ export class SubtitleOverlay {
       offset = index + match[0].length;
     }
     nodes.push(document.createTextNode(text.slice(offset)));
-    this.original.onclick = () => { if (this.currentCue) void this.showSentence(this.currentCue); };
     return nodes;
   }
 
@@ -297,15 +295,14 @@ export class SubtitleOverlay {
       return;
     }
     if (isQuotaProvider(this.settings.translationProvider)) {
-      // The subtitle line never spends AI quota: Chrome translates it on-device. A line the user
-      // already clicked has an AI translation in the cache, and that one is shown instead.
+      // The subtitle line never spends AI quota: Chrome translates it on-device.
       const cached = await cachedTranslation(cue.originalText, sourceLanguage, this.settings.targetLanguage, context);
       try {
         const result = cached ?? await quickTranslate(cue.originalText, sourceLanguage, this.settings.targetLanguage);
         if (isCurrent()) this.setTranslation(result.translatedText);
       } catch (error) {
         if (!isCurrent()) return;
-        this.translated.textContent = 'Клікніть рядок, щоб перекласти';
+        this.translated.textContent = 'Переклад недоступний';
         this.translated.title = readableError(error);
       }
       return;
@@ -351,7 +348,10 @@ export class SubtitleOverlay {
   private async loadWord(word: string, expanded: boolean, revision: number): Promise<void> {
     const cue = this.currentCue;
     const sourceLanguage = cue?.sourceLanguage ?? this.settings.sourceLanguage;
-    const context = cue?.contextText ?? cue?.originalText ?? '';
+    // The card explains the word in its sentence and shows that sentence's translation;
+    // neighbouring lines only help the AI pick the right meaning.
+    const context = cue?.originalText ?? '';
+    const surrounding = cue?.contextText ?? context;
     const provider = this.settings.translationProvider;
     const remoteKey = wordInsightCacheKey(`remote:${provider}`, sourceLanguage, this.settings.targetLanguage, word, context);
     const localKey = wordInsightCacheKey(`local:${provider}`, sourceLanguage, this.settings.targetLanguage, word, cue?.originalText ?? '');
@@ -360,7 +360,7 @@ export class SubtitleOverlay {
     this.showCard({ text: word, translatedText: useRemote && !insight ? 'Пояснення від ШІ…' : 'Переклад…', synonyms: [] });
     try {
       if (!insight && useRemote) {
-        insight = await this.requestRemoteWordInsight(word, context, sourceLanguage);
+        insight = await this.requestRemoteWordInsight(word, context, surrounding, sourceLanguage);
         if (insight) wordInsightCache.set(remoteKey, insight);
       }
       if (!insight) {
@@ -370,28 +370,13 @@ export class SubtitleOverlay {
       if (revision !== this.wordRevision) return;
       this.showCard(insight);
       if (!expanded && isQuotaProvider(provider) && !wordInsightCache.has(remoteKey)) this.appendHint('Клік — детальне пояснення від ШІ');
-      if (expanded) this.appendSaveButton(insight, context, sourceLanguage);
     } catch (error) {
       if (revision !== this.wordRevision) return;
       this.showCard({ text: word, translatedText: readableError(error), synonyms: [], context });
     }
   }
 
-  private async showSentence(cue: SubtitleCue): Promise<void> {
-    const revision = ++this.wordRevision;
-    this.showCard({ text: cue.originalText, translatedText: 'Переклад…', synonyms: [] });
-    try {
-      const result = await translate(cue.originalText, cue.sourceLanguage ?? this.settings.sourceLanguage, this.settings.targetLanguage, cue.contextText ?? cue.originalText);
-      if (revision === this.wordRevision) this.showCard({ text: result.text, translatedText: result.translatedText, synonyms: [] });
-      if (this.currentCue?.startTime === cue.startTime && this.currentCue.originalText === cue.originalText && this.settings.translationVisible) {
-        this.setTranslation(result.translatedText);
-      }
-    } catch (error) {
-      if (revision === this.wordRevision) this.showCard({ text: cue.originalText, translatedText: readableError(error), synonyms: [] });
-    }
-  }
-
-  private requestRemoteWordInsight(word: string, context: string, sourceLanguage: string): Promise<WordInsight | undefined> {
+  private requestRemoteWordInsight(word: string, context: string, surrounding: string, sourceLanguage: string): Promise<WordInsight | undefined> {
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     this.currentWordRequestId = requestId;
     return new Promise((resolve, reject) => {
@@ -407,6 +392,7 @@ export class SubtitleOverlay {
         requestId,
         word,
         context,
+        surrounding,
         sourceLanguage,
         targetLanguage: this.settings.targetLanguage
       }, (response) => {
@@ -476,21 +462,6 @@ export class SubtitleOverlay {
     });
   }
 
-  private appendSaveButton(insight: WordInsight, context: string, sourceLanguage: string): void {
-    const result: TranslationResult = {
-      text: insight.text,
-      translatedText: insight.translatedText,
-      sourceLanguage,
-      targetLanguage: this.settings.targetLanguage
-    };
-    const save = document.createElement('button');
-    save.className = 'lingua-save';
-    save.textContent = 'Зберегти слово';
-    save.onclick = () => void addDictionaryEntry(result, context);
-    this.card.append(save);
-    this.fitCard();
-  }
-
   private showCard(insight: WordInsight): void {
     this.cancelCardHide();
     this.card.hidden = false;
@@ -531,10 +502,9 @@ export class SubtitleOverlay {
       }
       this.card.append(label, example);
     }
-    // The current subtitle line and its translation are already on screen; repeating them only makes the card taller.
-    if (insight.context && insight.context.trim() !== this.currentCue?.originalText.trim()) {
+    if (insight.context) {
       const label = document.createElement('small');
-      label.textContent = 'Контекст із субтитрів';
+      label.textContent = 'Переклад фрази';
       const context = document.createElement('div');
       context.className = 'lingua-context';
       const source = document.createElement('p');

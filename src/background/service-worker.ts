@@ -388,19 +388,21 @@ async function createWordInsight(
   sourceLanguage: string,
   targetLanguage: string,
   stored: Record<string, unknown>,
-  signal: AbortSignal
+  signal: AbortSignal,
+  surrounding = ''
 ): Promise<WordInsight> {
   const dictionaryPromise = lookupEnglishWordFast(word.toLocaleLowerCase(), sourceLanguage.toLocaleLowerCase(), signal);
   const prompt = [
     `Create language-learning data for the highlighted ${sourceLanguage} word "${word}" and translate it into ${targetLanguage}.`,
-    `Full subtitle context: ${JSON.stringify(context)}`,
+    `Subtitle sentence: ${JSON.stringify(context)}`,
+    ...(surrounding && surrounding !== context ? [`Neighbouring subtitle lines (only to understand the meaning): ${JSON.stringify(surrounding)}`] : []),
     'Determine the exact meaning, part of speech, tense, and idiomatic use of the highlighted word in this context before answering.',
     'wordTranslation must be the short, natural equivalent of the highlighted word as it is used in this exact sentence, not its most common dictionary meaning and not a literal calque.',
     'Synonyms and the example sentence must use the same contextual meaning. Do not mix unrelated meanings of the word.',
     'Create one short, natural example sentence.',
     'The example must contain the hovered word exactly as written, as a separate word.',
     'Return only one JSON object with string fields wordTranslation, example, exampleTranslation, contextTranslation and a synonyms array.',
-    'Synonyms must be in the source language. contextTranslation must translate every sentence of the full subtitle context naturally: check negation, WH-words, direction, tense and pronouns against the source, preserve punctuation and do not merge separate sentences.'
+    'Synonyms must be in the source language. contextTranslation must translate the subtitle sentence naturally: check negation, WH-words, direction, tense and pronouns against the source and preserve punctuation.'
   ].join('\n');
   const parsed = parseJsonObject(await requestProvider(provider, prompt, stored, signal, true));
   const dictionary = await dictionaryPromise;
@@ -431,13 +433,14 @@ async function createDeepLWordInsight(
   sourceLanguage: string,
   targetLanguage: string,
   stored: Record<string, unknown>,
-  signal: AbortSignal
+  signal: AbortSignal,
+  surrounding = ''
 ): Promise<WordInsight> {
   const dictionaryPromise = lookupEnglishWordFast(word.toLocaleLowerCase(), sourceLanguage.toLocaleLowerCase(), signal);
   const baseTexts = [word, ...(context ? [context] : [])];
   const [dictionary, baseTranslations] = await Promise.all([
     dictionaryPromise,
-    limited('deepl', 'high', () => requestDeepL(baseTexts, sourceLanguage, targetLanguage, stored, context, signal))
+    limited('deepl', 'high', () => requestDeepL(baseTexts, sourceLanguage, targetLanguage, stored, surrounding || context, signal))
   ]);
   const example = dictionary.examples.find((item) => containsWord(item, word));
   const exampleTranslation = example
@@ -457,6 +460,8 @@ async function createDeepLWordInsight(
 }
 
 chrome.runtime.onInstalled.addListener(() => {
+  // Saving words was removed; drop the old saved list.
+  void chrome.storage.local.remove('dictionary');
   void chrome.storage.local.get(null).then((stored) => {
     const legacyLocalDefault = stored.translationProvider === 'libretranslate'
       && (!stored.translationEndpoint || stored.translationEndpoint === 'http://127.0.0.1:5000' || stored.translationEndpoint === 'http://127.0.0.1:5050')
@@ -624,14 +629,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       const word = typeof message.word === 'string' ? message.word.trim().slice(0, 80) : '';
       const context = typeof message.context === 'string' ? message.context.trim().slice(0, 800) : '';
+      const surrounding = typeof message.surrounding === 'string' ? message.surrounding.trim().slice(0, 1200) : '';
       const sourceLanguage = typeof message.sourceLanguage === 'string' ? message.sourceLanguage : 'en';
       const targetLanguage = typeof message.targetLanguage === 'string' ? message.targetLanguage : 'uk';
       if (!word) throw new Error('Не вказано слово');
       let insight: WordInsight;
       try {
         insight = provider === 'deepl'
-          ? await createDeepLWordInsight(word, context, sourceLanguage, targetLanguage, stored, controller.signal)
-          : await createWordInsight(provider, word, context, sourceLanguage, targetLanguage, stored, controller.signal);
+          ? await createDeepLWordInsight(word, context, sourceLanguage, targetLanguage, stored, controller.signal, surrounding)
+          : await createWordInsight(provider, word, context, sourceLanguage, targetLanguage, stored, controller.signal, surrounding);
       } catch (error) {
         if (provider === 'deepl'
           && error instanceof ProviderRequestError
@@ -639,7 +645,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           && stored.groqFallbackEnabled === true
           && typeof stored.groqApiKey === 'string'
           && stored.groqApiKey.trim()) {
-          insight = await createWordInsight('groq', word, context, sourceLanguage, targetLanguage, stored, controller.signal);
+          insight = await createWordInsight('groq', word, context, sourceLanguage, targetLanguage, stored, controller.signal, surrounding);
         } else {
           throw error;
         }

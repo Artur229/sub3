@@ -74,9 +74,3 @@ export interface WordInsight {
   contextTranslation?: string;
   provider?: 'chrome' | 'libretranslate' | 'deepl' | 'gemini' | 'groq';
 }
-
-export interface DictionaryEntry extends TranslationResult {
-  id: string;
-  context: string;
-  addedAt: string;
-}

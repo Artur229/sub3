@@ -79,7 +79,7 @@ export function App() {
           <Toggle id="show-original" label="Оригінал" checked={settings.originalVisible} onChange={(originalVisible) => void update({ originalVisible })} />
           <Toggle id="show-translation" label="Переклад" checked={settings.translationVisible} onChange={(translationVisible) => void update({ translationVisible })} />
         </div>
-        <p className="hint">Наведіть на слово, щоб побачити переклад. Клік по слову або рядку — точніший переклад{quota ? ` від ${providerName}` : ''}.</p>
+        <p className="hint">Наведіть на слово, щоб побачити переклад. Клік по слову — пояснення{quota ? ` від ${providerName}` : ''} і переклад усієї фрази.</p>
 
         <h2>Відео без субтитрів</h2>
         <div className="group">
@@ -111,7 +111,7 @@ export function App() {
           ? 'Перекладає сам Chrome, без ключа й лімітів. Мовний пакет завантажиться під час першого перекладу.'
           : settings.translationProvider === 'libretranslate'
             ? 'Локальний сервер: npm run translator.'
-            : `Рядок під субтитрами перекладає Chrome. ${providerName} працює лише, коли ви клікаєте слово або рядок. Ключ зберігається тільки в цьому браузері.`}</p>
+            : `Рядок під субтитрами перекладає Chrome. ${providerName} працює лише, коли ви клікаєте на слово. Ключ зберігається тільки в цьому браузері.`}</p>
         <p className="hint">На YouTube рядок перекладу береться з автоперекладу YouTube, а якщо ввімкнено «Готові субтитри» — з субтитрів, зроблених людиною. Chrome перекладає лише те, чого там немає.</p>
         {quota && <p className="usage">Запитів сьогодні <b>{usage[settings.translationProvider] ?? 0}</b></p>}
 

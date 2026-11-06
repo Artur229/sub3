@@ -18,7 +18,6 @@ vi.mock('../translation/translation-manager', () => ({
     targetLanguage
   }))
 }));
-vi.mock('../dictionary/dictionary-store', () => ({ addDictionaryEntry: vi.fn() }));
 
 import { SubtitleOverlay } from './subtitle-overlay';
 import { translate } from '../translation/translation-manager';
@@ -71,8 +70,8 @@ describe('SubtitleOverlay fallback', () => {
                 synonyms: ['approach', 'plan'],
                 example: 'That strategy worked well.',
                 exampleTranslation: 'Ця стратегія добре спрацювала.',
-                context: 'Try this. A useful strategy.',
-                contextTranslation: 'Спробуй це. Корисна стратегія.',
+                context: 'A useful strategy.',
+                contextTranslation: 'Корисна стратегія.',
                 provider: 'groq'
               }
             });
@@ -150,7 +149,7 @@ describe('SubtitleOverlay fallback', () => {
 
     document.querySelector<HTMLElement>('.lingua-word:last-of-type')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await vi.waitFor(() => expect(document.querySelector('.lingua-card')?.textContent).toContain('That strategy worked well.'));
-    expect(document.querySelector('.lingua-save')).not.toBeNull();
+    expect(document.querySelector('.lingua-save')).toBeNull();
 
     const stack = document.querySelector('.lingua-subtitle-stack') as HTMLElement;
     const card = document.querySelector('.lingua-card') as HTMLElement;
@@ -159,7 +158,7 @@ describe('SubtitleOverlay fallback', () => {
     expect(card.textContent).toContain('approach');
     expect(card.textContent).toContain('Приклад зі словом');
     expect(card.textContent).toContain('Ця стратегія добре спрацювала.');
-    expect(card.textContent).toContain('Контекст із субтитрів');
+    expect(card.textContent).toContain('Переклад фрази');
     expect(card.textContent).toContain('Корисна стратегія.');
     expect(getComputedStyle(card).position).not.toBe('absolute');
 
@@ -191,7 +190,7 @@ describe('SubtitleOverlay fallback', () => {
     overlay.destroy();
   });
 
-  it('translates the subtitle line with Chrome and asks the AI only when the line is clicked', async () => {
+  it('translates the subtitle line with Chrome only, and clicking the line asks nothing', async () => {
     const video = document.createElement('video');
     Object.defineProperty(video, 'currentTime', { value: 1, writable: true });
     Object.defineProperty(video, 'textTracks', { value: Object.assign([], { addEventListener: vi.fn() }) });
@@ -206,8 +205,10 @@ describe('SubtitleOverlay fallback', () => {
     expect(translate).not.toHaveBeenCalled();
 
     (document.querySelector('.lingua-original') as HTMLElement).click();
-    await vi.waitFor(() => expect(line.textContent).toBe('uk:Things change.'));
-    expect(translate).toHaveBeenCalledTimes(1);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(line.textContent).toBe('chrome:Things change.');
+    expect(translate).not.toHaveBeenCalled();
+    expect((document.querySelector('.lingua-card') as HTMLElement).hidden).toBe(true);
     overlay.destroy();
   });
 
