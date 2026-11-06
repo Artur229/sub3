@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sub3 Test Video</title>
+    <style>body{margin:40px auto;max-width:800px;font:16px system-ui,sans-serif;background:#f8fafc;color:#172033}video{width:100%}</style>
+  </head>
+  <body>
+    <h1>Sub3 HTML5 test video</h1>
+    <p>The English captions below are added through the standard TextTrack API.</p>
+    <video controls muted>
+      <source src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4" type="video/mp4" />
+    </video>
+    <script>
+      const video = document.querySelector('video');
+      const track = video.addTextTrack('captions', 'English', 'en');
+      track.addCue(new VTTCue(0, 3, 'Hello, friend!'));
+      track.addCue(new VTTCue(3, 6, 'This video demonstrates interactive subtitles.'));
+      track.addCue(new VTTCue(6, 8, 'Move the cursor over any word.'));
+    </script>
+  </body>
+</html>

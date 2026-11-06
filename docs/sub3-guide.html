@@ -1,0 +1,184 @@
+<title>Як користуватися Sub3</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Unbounded:wght@600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one readable column; steps as a real numbered sequence; a dual-subtitle mock as the opener */
+:root {
+  --bg: #f5f7fa;
+  --surface: #ffffff;
+  --ink: #142033;
+  --muted: #5b6a80;
+  --line: #dde3ec;
+  --accent: #2563c9;
+  --accent-soft: #e6eefb;
+  --warn: #9a5b00;
+  --warn-soft: #fdf2df;
+  --screen: #0e1622;
+  --screen-ink: #ffffff;
+  --screen-word: #8ed7ff;
+  --font-display: "Unbounded", "Onest", system-ui, sans-serif;
+  --font-body: "Onest", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f141c; --surface: #161d28; --ink: #e7edf6; --muted: #9aa8bc; --line: #263142;
+    --accent: #7fb0ff; --accent-soft: #1a2a44; --warn: #f0b860; --warn-soft: #2e2414;
+    --screen: #05090f; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f141c; --surface: #161d28; --ink: #e7edf6; --muted: #9aa8bc; --line: #263142;
+  --accent: #7fb0ff; --accent-soft: #1a2a44; --warn: #f0b860; --warn-soft: #2e2414;
+  --screen: #05090f; color-scheme: dark;
+}
+body { background: var(--bg); color: var(--ink); font: 400 16px/1.6 var(--font-body); }
+.wrap { max-width: 760px; margin: 0 auto; padding-block: 40px 72px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 40px; }
+h1, h2 { font-family: var(--font-display); text-wrap: balance; line-height: 1.2; margin: 0; }
+h1 { font-size: clamp(28px, 6vw, 40px); }
+h2 { font-size: 21px; }
+h3 { font-size: 17px; margin: 0; font-weight: 600; }
+p { margin: 0; }
+a { color: var(--accent); }
+code, kbd { font-family: var(--font-mono); font-size: .88em; background: var(--accent-soft); padding: 1px 6px; border-radius: 4px; overflow-wrap: anywhere; }
+.lead { color: var(--muted); font-size: 18px; max-width: 62ch; }
+header { display: grid; gap: 14px; }
+.eyebrow { font: 600 12px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+
+.screen { background: var(--screen); border-radius: 12px; aspect-ratio: 16 / 7; max-width: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 6px; padding: 18px 16px 22px; position: relative; overflow: hidden; }
+.screen .bar { position: absolute; left: 16px; right: 16px; bottom: 8px; height: 3px; border-radius: 2px; background: rgb(255 255 255 / .18); }
+.screen .bar::after { content: ""; display: block; width: 38%; height: 100%; border-radius: 2px; background: var(--screen-word); }
+.sub { color: var(--screen-ink); font-weight: 700; font-size: clamp(14px, 3.4vw, 20px); background: rgb(0 0 0 / .35); padding: 2px 10px; border-radius: 6px; text-align: center; }
+.sub.orig { opacity: .9; }
+.sub .w { color: var(--screen-word); text-decoration: underline dotted; text-underline-offset: 4px; }
+.card { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); background: rgb(13 16 23 / .96); border: 1px solid rgb(255 255 255 / .18); border-radius: 10px; padding: 8px 12px; color: #fff; font-size: 13px; display: grid; gap: 2px; width: min(280px, 80%); }
+.card b { font-size: 15px; }
+.card small { color: #8fa4c4; }
+
+section { display: grid; gap: 16px; }
+.steps { list-style: none; counter-reset: s; margin: 0; padding: 0; display: grid; gap: 12px; }
+.steps > li { counter-increment: s; display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; align-items: start; }
+.steps > li::before { content: counter(s); width: 30px; height: 30px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font: 700 14px var(--font-mono); display: grid; place-items: center; }
+.steps > li > div { display: grid; gap: 4px; min-width: 0; padding-top: 3px; }
+.muted { color: var(--muted); }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 520px; font-size: 15px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 600 12px var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+tr:last-child td { border-bottom: 0; }
+.pill { display: inline-block; font: 600 12px var(--font-mono); padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+
+.note { background: var(--warn-soft); color: var(--ink); border-radius: 10px; padding: 12px 16px; display: grid; gap: 4px; }
+.note strong { color: var(--warn); }
+
+.gestures { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.gesture { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.gesture .act { font: 600 12px var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+
+dl { margin: 0; display: grid; gap: 14px; }
+dt { font-weight: 600; }
+dd { margin: 4px 0 0; color: var(--muted); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">Інструкція для користувачів · Sub3 0.8</span>
+    <h1>Як користуватися Sub3</h1>
+    <p class="lead">Sub3 — розширення для Chrome, яке показує під відео два рядки субтитрів: оригінал і переклад. Наведіть курсор на будь-яке слово, щоб побачити його переклад, синоніми та приклад.</p>
+    <div class="screen" aria-label="Приклад: два рядки субтитрів під відео і картка зі словом">
+      <div class="card"><b>tired</b><span>втомився</span><small>Синоніми: exhausted, worn out</small></div>
+      <div class="sub orig">I'm too <span class="w">tired</span> to go out tonight.</div>
+      <div class="sub">Я надто втомився, щоб іти кудись сьогодні.</div>
+      <div class="bar"></div>
+    </div>
+  </header>
+
+  <section>
+    <h2>Що потрібно</h2>
+    <ul class="muted" style="margin:0;padding-left:20px;display:grid;gap:4px">
+      <li>Google Chrome на комп'ютері (Windows, macOS або Linux), бажано останньої версії. На телефоні розширення не працює.</li>
+      <li>Архів <code>sub3-extension.zip</code>, який вам надіслав автор.</li>
+      <li>Для звичайного перекладу ключі не потрібні. Ключ знадобиться лише для перекладу через ШІ (див. «Вибір перекладача»).</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Встановлення</h2>
+    <ol class="steps">
+      <li><div><h3>Розпакуйте архів</h3><p>Розпакуйте <code>sub3-extension.zip</code> у папку, яку не будете видаляти, наприклад <code>Документи/Sub3</code>. Chrome читає розширення прямо з цієї папки: якщо її видалити або перемістити, Sub3 перестане працювати.</p></div></li>
+      <li><div><h3>Відкрийте сторінку розширень</h3><p>Введіть в адресному рядку Chrome <code>chrome://extensions</code> і натисніть Enter.</p></div></li>
+      <li><div><h3>Увімкніть «Режим розробника»</h3><p>Перемикач <b>Developer mode / Режим розробника</b> знаходиться в правому верхньому куті.</p></div></li>
+      <li><div><h3>Завантажте розширення</h3><p>Натисніть <b>Load unpacked / Завантажити розпаковане</b> і виберіть розпаковану папку — ту, де лежить файл <code>manifest.json</code>.</p></div></li>
+      <li><div><h3>Закріпіть іконку</h3><p>Натисніть на іконку пазла праворуч від адресного рядка і закріпіть Sub3 кнопкою-шпилькою. Так налаштування завжди будуть під рукою.</p></div></li>
+      <li><div><h3>Перезавантажте відкриті вкладки з відео</h3><p>Sub3 запускається лише на сторінках, відкритих після встановлення.</p></div></li>
+    </ol>
+    <div class="note"><strong>Попередження Chrome</strong><p>Іноді Chrome показує вікно з пропозицією вимкнути розширення в режимі розробника. Це нормально для розширень, встановлених не з Chrome Web Store: просто закрийте вікно.</p></div>
+  </section>
+
+  <section>
+    <h2>Перше налаштування</h2>
+    <ol class="steps">
+      <li><div><h3>Виберіть мови</h3><p>Натисніть іконку Sub3. На вкладці <b>Загальні</b> вкажіть <b>мову оригіналу</b> (мову субтитрів у відео, наприклад English) і <b>мову перекладу</b> (наприклад Українська).</p><p class="muted">Мова оригіналу має збігатися з мовою субтитрів. Якщо у відео є лише іспанські субтитри, а вибрано English, Sub3 нічого не покаже.</p></div></li>
+      <li><div><h3>Виберіть перекладача</h3><p>Вкладка <b>Переклад</b> → <b>Провайдер</b>. Для початку залиште <b>Chrome — без ключа</b>.</p></div></li>
+      <li><div><h3>Налаштуйте вигляд</h3><p>На вкладці <b>Вигляд</b> можна змінити розмір і колір тексту, висоту субтитрів над низом відео та прозорість фону. Зміни видно одразу.</p></div></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Вибір перекладача</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Провайдер</th><th>Ключ</th><th>Коли обирати</th></tr></thead>
+        <tbody>
+          <tr><td><b>Chrome</b></td><td><span class="pill">не потрібен</span></td><td>Безкоштовно, без лімітів, працює на вашому комп'ютері. Під час першого перекладу Chrome сам завантажить мовний пакет.</td></tr>
+          <tr><td><b>DeepL</b></td><td>безкоштовний ключ на <a href="https://www.deepl.com/pro-api" target="_blank" rel="noopener">deepl.com/pro-api</a></td><td>Природніший переклад фраз. На безкоштовному тарифі є місячний ліміт символів.</td></tr>
+          <tr><td><b>Gemini</b></td><td>ключ на <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a></td><td>Найкраще передає ідіоми й розмовні фрази. Безкоштовний ліміт запитів на день невеликий.</td></tr>
+          <tr><td><b>Groq</b></td><td>ключ на <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a></td><td>Найшвидший ШІ. Цей самий ключ потрібен для розпізнавання мовлення у відео без субтитрів.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Скопіюйте ключ із сайту й вставте в поле на вкладці <b>Переклад</b>. Ключ зберігається лише у вашому Chrome і нікуди більше не передається.</p>
+    <p class="muted">Як Sub3 економить ліміти ШІ: рядок перекладу під субтитрами завжди робить Chrome, безкоштовно. Gemini, Groq чи DeepL працюють лише тоді, коли ви клікаєте на слово або на рядок оригіналу. Скільки запитів зроблено сьогодні, видно на вкладці <b>Переклад</b>.</p>
+  </section>
+
+  <section>
+    <h2>Під час перегляду</h2>
+    <p>Відкрийте відео з субтитрами (наприклад, на YouTube) і ввімкніть субтитри в самому плеєрі. Sub3 сховає оригінальні субтитри плеєра й покаже свої два рядки.</p>
+    <div class="gestures">
+      <div class="gesture"><span class="act">Навести на слово</span><p>Переклад слова, синоніми й приклад. Це безкоштовно і не витрачає ліміти ШІ.</p></div>
+      <div class="gesture"><span class="act">Клікнути на слово</span><p>Детальне пояснення від ШІ з урахуванням контексту і кнопка <b>Зберегти слово</b>.</p></div>
+      <div class="gesture"><span class="act">Клікнути по рядку</span><p>Точніший переклад усієї фрази від ШІ. Він замінює переклад Chrome під субтитрами.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Відео без субтитрів</h2>
+    <p>Для трансляцій (наприклад, Twitch) і відео без субтитрів Sub3 може сам розпізнати мовлення.</p>
+    <ol class="steps">
+      <li><div><p>Вставте <b>Groq API key</b> на вкладці <b>Переклад</b>.</p></div></li>
+      <li><div><p>На вкладці <b>Загальні</b> залиште <b>Розпізнавання мовлення: Groq Cloud</b>.</p></div></li>
+      <li><div><p>Відкрийте вкладку з відео, натисніть іконку Sub3 і кнопку <b>Розпізнавати ефір</b>. Перший текст з'явиться приблизно через 10–12 секунд.</p></div></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Якщо щось не працює</h2>
+    <dl>
+      <div><dt>Субтитри Sub3 не з'являються</dt><dd>Перевірте, що субтитри ввімкнені в плеєрі і їхня мова збігається з «мовою оригіналу». Перезавантажте сторінку. Перевірте, що перемикач угорі вікна Sub3 увімкнено.</dd></div>
+      <div><dt>Netflix, Disney+ та інші платні сервіси</dt><dd>Вони захищають субтитри (DRM), тому Sub3 там зазвичай не працює. Найкраще він працює на YouTube і сайтах зі звичайним HTML5-плеєром.</dd></div>
+      <div><dt>«Ліміт … тимчасово вичерпано»</dt><dd>Ви вичерпали безкоштовні запити ШІ. Sub3 сам зробить паузу і продовжить пізніше. Поки що переключіться на Chrome або ввімкніть «Fallback на Groq при ліміті».</dd></div>
+      <div><dt>«Переклад недоступний» з провайдером Chrome</dt><dd>Оновіть Chrome до останньої версії. У деяких вбудованих плеєрах (iframe) переклад Chrome недоступний: виберіть DeepL, Gemini або Groq.</dd></div>
+    </dl>
+  </section>
+
+  <section>
+    <h2>Оновлення до нової версії</h2>
+    <ol class="steps">
+      <li><div><p>Отримайте новий <code>sub3-extension.zip</code> і розпакуйте його в ту саму папку, замінивши старі файли.</p></div></li>
+      <li><div><p>Відкрийте <code>chrome://extensions</code> і натисніть кнопку оновлення (кругла стрілка) на картці Sub3. Налаштування, ключі й збережені слова залишаться.</p></div></li>
+      <li><div><p>Перезавантажте вкладки з відео.</p></div></li>
+    </ol>
+  </section>
+</div>

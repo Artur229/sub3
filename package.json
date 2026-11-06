@@ -1,0 +1,29 @@
+{
+  "name": "sub3",
+  "version": "0.8.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit && vite build && vite build --config vite.content.config.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "demo": "vite --host 127.0.0.1",
+    "translator": "XDG_DATA_HOME=\"$PWD/.lingua-data/data\" XDG_CONFIG_HOME=\"$PWD/.lingua-data/config\" XDG_CACHE_HOME=\"$PWD/.lingua-data/cache\" .venv-libretranslate/bin/libretranslate --host 127.0.0.1 --port 5050 --load-only en,uk",
+    "mlx-whisper": ".venv-mlx/bin/python tools/mlx_whisper_server.py"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "6.1.2",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "vite": "8.3.4"
+  },
+  "devDependencies": {
+    "@types/chrome": "0.3.4",
+    "@types/node": "26.6.4",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "jsdom": "30.1.2",
+    "typescript": "7.0.2",
+    "vitest": "5.0.3"
+  }
+}

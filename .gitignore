@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+.DS_Store
+.venv-libretranslate/
+.lingua-data/
+sub3-extension.zip
+.venv-mlx/
+.claude/
+# Local agent tooling and logs, not part of the extension
+.agents/
+skills-lock.json
+.playwright-mcp/
+*.log
