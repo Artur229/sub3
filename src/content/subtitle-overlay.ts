@@ -3,6 +3,17 @@ import { cachedTranslation, isQuotaProvider, quickTranslate, translate } from '.
 
 const wordPattern = /[\p{L}\p{M}]+(?:['’\-][\p{L}\p{M}]+)*/gu;
 const wordInsightCache = new Map<string, WordInsight>();
+/**
+ * One AI translation per subtitle sentence. Every word click asks the AI about the whole sentence,
+ * and each answer words it a little differently; the first one is kept and shown for every word
+ * of that sentence (and on hover), so the phrase translation does not change from word to word.
+ */
+const sentenceTranslations = new Map<string, string>();
+
+function sentenceKey(provider: string, sourceLanguage: string, targetLanguage: string, sentence: string): string {
+  return [provider, sourceLanguage, targetLanguage, sentence.trim()].join('\n');
+}
+
 /** How long text read from the page must stay unchanged before it is translated again. */
 const LIVE_TRANSLATION_DELAY_MS = 450;
 
@@ -103,12 +114,9 @@ export class SubtitleOverlay {
   private mountForFullscreen(): void {
     const vendorDocument = document as Document & { webkitFullscreenElement?: Element | null };
     const fullscreenElement = document.fullscreenElement ?? vendorDocument.webkitFullscreenElement;
-    const videoContainer = this.video.parentElement;
     const mountPoint = fullscreenElement instanceof HTMLElement && fullscreenElement.contains(this.video)
       ? fullscreenElement
-      : videoContainer && videoContainer !== document.body && videoContainer !== document.documentElement
-        ? videoContainer
-        : document.documentElement;
+      : this.videoMountPoint();
     if (this.root.parentElement === mountPoint) return;
     this.restorePositionedContainer();
     if (mountPoint !== document.documentElement && getComputedStyle(mountPoint).position === 'static') {
@@ -117,6 +125,26 @@ export class SubtitleOverlay {
       mountPoint.style.position = 'relative';
     }
     mountPoint.append(this.root);
+  }
+
+  /**
+   * The overlay goes next to the video. The video's own container is used when it is already
+   * positioned, or when it fully wraps the video so making it `position: relative` changes nothing.
+   * Some players (TikTok) keep the video in a zero-height wrapper and position it against a higher
+   * element; making that wrapper relative collapses the video. There the overlay goes into the
+   * nearest positioned ancestor instead, without touching the page's styles.
+   */
+  private videoMountPoint(): HTMLElement {
+    const container = this.video.parentElement;
+    if (!container || container === document.body || container === document.documentElement) return document.documentElement;
+    if (container === this.positionedContainer || getComputedStyle(container).position !== 'static') return container;
+    const video = this.video.getBoundingClientRect();
+    const box = container.getBoundingClientRect();
+    if (box.width >= video.width - 1 && box.height >= video.height - 1) return container;
+    for (let element = container.parentElement; element && element !== document.body && element !== document.documentElement; element = element.parentElement) {
+      if (getComputedStyle(element).position !== 'static') return element;
+    }
+    return document.documentElement;
   }
 
   private restorePositionedContainer(): void {
@@ -368,7 +396,10 @@ export class SubtitleOverlay {
         wordInsightCache.set(localKey, insight);
       }
       if (revision !== this.wordRevision) return;
-      this.showCard(insight);
+      const phraseKey = sentenceKey(provider, sourceLanguage, this.settings.targetLanguage, context);
+      if (useRemote && insight.contextTranslation && !sentenceTranslations.has(phraseKey)) sentenceTranslations.set(phraseKey, insight.contextTranslation);
+      const phrase = sentenceTranslations.get(phraseKey);
+      this.showCard(phrase ? { ...insight, contextTranslation: phrase } : insight);
       if (!expanded && isQuotaProvider(provider) && !wordInsightCache.has(remoteKey)) this.appendHint('Клік — детальне пояснення від ШІ');
     } catch (error) {
       if (revision !== this.wordRevision) return;

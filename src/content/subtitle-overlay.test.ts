@@ -279,6 +279,40 @@ describe('SubtitleOverlay fallback', () => {
     overlay.destroy();
   });
 
+  it('does not touch a zero-height video wrapper (TikTok) and mounts in the positioned player instead', () => {
+    const player = document.createElement('div');
+    player.style.position = 'relative';
+    const wrapper = document.createElement('div');
+    const video = document.createElement('video');
+    Object.defineProperty(video, 'currentTime', { value: 1, writable: true });
+    Object.defineProperty(video, 'textTracks', { value: Object.assign([], { addEventListener: vi.fn() }) });
+    video.getBoundingClientRect = () => ({ x: 0, y: 0, top: 0, left: 0, right: 348, bottom: 618, width: 348, height: 618, toJSON: () => ({}) });
+    wrapper.getBoundingClientRect = () => ({ x: 0, y: 0, top: 0, left: 0, right: 348, bottom: 0, width: 348, height: 0, toJSON: () => ({}) });
+    wrapper.append(video);
+    player.append(wrapper);
+    document.body.append(player);
+    const overlay = new SubtitleOverlay(video, settings);
+    expect(document.querySelector('.lingua-subtitle-overlay')?.parentElement).toBe(player);
+    expect(wrapper.style.position).toBe('');
+    overlay.destroy();
+    player.remove();
+  });
+
+  it('marks the overlay inactive with empty lines when no subtitle is on screen', () => {
+    const video = document.createElement('video');
+    Object.defineProperty(video, 'currentTime', { value: 10, writable: true });
+    Object.defineProperty(video, 'textTracks', { value: Object.assign([], { addEventListener: vi.fn() }) });
+    video.getBoundingClientRect = () => ({ x: 0, y: 0, top: 0, left: 0, right: 640, bottom: 360, width: 640, height: 360, toJSON: () => ({}) });
+    document.body.append(video);
+    const overlay = new SubtitleOverlay(video, settings);
+    overlay.setExternalCues([{ startTime: 0, endTime: 5, originalText: 'Earlier line.', sourceLanguage: 'en' }]);
+    const root = document.querySelector('.lingua-subtitle-overlay') as HTMLElement;
+    expect(root.dataset.active).toBe('false');
+    expect((document.querySelector('.lingua-original') as HTMLElement).textContent).toBe('');
+    expect((document.querySelector('.lingua-translation') as HTMLElement).textContent).toBe('');
+    overlay.destroy();
+  });
+
   it('moves the overlay into the fullscreen player and keeps appearance values', () => {
     const player = document.createElement('div');
     const video = document.createElement('video');

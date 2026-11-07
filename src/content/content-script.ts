@@ -4,6 +4,7 @@ import { SubtitleOverlay } from './subtitle-overlay';
 import type { ExtensionSettings, SubtitleCue } from '../shared/types';
 import { attachTranslations, extractRemoteSubtitles, parseTimedSubtitles, type RemoteSubtitle } from './external-subtitles';
 import { findSubtitleDomSource, readSubtitleDomText, type SubtitleDomSource } from './dom-subtitles';
+import { extractTikTokTracks, isTikTok, tiktokVideoId, type TikTokTrack } from './tiktok-subtitles';
 import { preloadTranslations } from '../translation/translation-manager';
 import './overlay.css';
 
@@ -12,6 +13,10 @@ const overlays = new Map<HTMLVideoElement, SubtitleOverlay>();
 let settings: ExtensionSettings;
 const subtitleCache = new Map<string, SubtitleCue[]>();
 const translationTrackCache = new Map<string, SubtitleCue[]>();
+// TikTok: subtitle tracks per video id, built cues per video id and languages, and what each <video> shows.
+const tiktokTracks = new Map<string, TikTokTrack[]>();
+const tiktokCues = new Map<string, Promise<SubtitleCue[] | undefined>>();
+const tiktokVideoCues = new WeakMap<HTMLVideoElement, SubtitleCue[]>();
 let latestSources: RemoteSubtitle[] = [];
 let currentExternalCues: SubtitleCue[] = [];
 let currentFallbackCue: SubtitleCue | undefined;
@@ -56,6 +61,10 @@ async function consumeYouTubeTracks(value: unknown): Promise<void> {
 
 async function consumeNetworkPayload(payload: { body?: string; url?: string }): Promise<void> {
   const raw = payload.body ?? '';
+  if (isTikTok()) {
+    try { rememberTikTokTracks(JSON.parse(raw)); } catch { /* Not a JSON feed response. */ }
+    return;
+  }
   let value: unknown = raw;
   try { value = JSON.parse(raw); } catch { /* Some players return a labelled URL string, not JSON. */ }
   const sources = extractRemoteSubtitles(value);
@@ -157,6 +166,69 @@ function scheduleTrackPreload(cues: SubtitleCue[], sourceUrl: string): void {
   else globalThis.setTimeout(run, 350);
 }
 
+function rememberTikTokTracks(value: unknown): void {
+  const found = extractTikTokTracks(value);
+  if (!found.size) return;
+  found.forEach((tracks, id) => tiktokTracks.set(id, tracks));
+  refreshTikTokVideos();
+}
+
+function readTikTokPageData(): void {
+  const text = document.getElementById('__UNIVERSAL_DATA_FOR_REHYDRATION__')?.textContent;
+  if (!text) return;
+  try { rememberTikTokTracks(JSON.parse(text)); } catch { /* The page changed its embedded data format. */ }
+}
+
+/**
+ * The TikTok feed keeps several <video> elements on the page at once, so each overlay gets the
+ * subtitles of its own video instead of one track for the whole page.
+ */
+function refreshTikTokVideos(): void {
+  if (!isTikTok()) return;
+  overlays.forEach((overlay, video) => void showTikTokSubtitles(video, overlay));
+}
+
+async function showTikTokSubtitles(video: HTMLVideoElement, overlay: SubtitleOverlay): Promise<void> {
+  const id = tiktokVideoId(video);
+  const tracks = id ? tiktokTracks.get(id) : undefined;
+  if (!id || !tracks) {
+    if (tiktokVideoCues.has(video)) {
+      tiktokVideoCues.delete(video);
+      overlay.setExternalCues([]);
+    }
+    return;
+  }
+  const key = [id, languageCode(settings.sourceLanguage), languageCode(settings.targetLanguage)].join('|');
+  let loading = tiktokCues.get(key);
+  if (!loading) {
+    loading = buildTikTokCues(tracks);
+    tiktokCues.set(key, loading);
+    void loading.then((cues) => { if (!cues) tiktokCues.delete(key); });
+  }
+  const cues = await loading;
+  if (!cues || tiktokVideoCues.get(video) === cues || overlays.get(video) !== overlay) return;
+  tiktokVideoCues.set(video, cues);
+  document.documentElement.classList.add('sub3-external-subtitles');
+  overlay.setExternalCues(cues);
+  scheduleTrackPreload(cues.filter((cue) => !cue.translatedText), `tiktok:${id}`);
+}
+
+/** Original: the video's own captions in the subtitle language. Translation: TikTok's machine translation into the target language, if it has one. */
+async function buildTikTokCues(tracks: TikTokTrack[]): Promise<SubtitleCue[] | undefined> {
+  const desired = languageCode(settings.sourceLanguage);
+  const own = tracks.filter((track) => track.kind !== 'mt');
+  const source = (desired === 'auto' ? own : own.filter((track) => languageCode(track.language) === desired))[0];
+  if (!source) return undefined;
+  const original = addNeighborContexts(await fetchCues(source.url, languageCode(source.language)));
+  if (!original.length) return undefined;
+  const target = languageCode(settings.targetLanguage);
+  const translation = languageCode(source.language) === target
+    ? undefined
+    : tracks.find((track) => track !== source && languageCode(track.language) === target);
+  const lines = translation ? await fetchCues(translation.url, target) : [];
+  return lines.length ? attachTranslations(original, lines) : original;
+}
+
 function selectSource(sources: RemoteSubtitle[]): RemoteSubtitle | undefined {
   const desired = languageCode(settings.sourceLanguage);
   const matching = desired === 'auto' ? sources : sources.filter((source) => languageCode(source.language) === desired);
@@ -176,6 +248,9 @@ function languageCode(language: string): string {
   if (/^(en|eng|english)$/.test(value)) return 'en';
   if (/^(uk|ua|ukr|українська|украинский|українські)$/.test(value)) return 'uk';
   if (/^(ru|rus|русский|русские)$/.test(value)) return 'ru';
+  // TikTok uses three-letter codes (deu-DE, spa-ES); map the common ones to the two-letter codes in settings.
+  const threeLetter: Record<string, string> = { deu: 'de', ger: 'de', fra: 'fr', fre: 'fr', spa: 'es', pol: 'pl', ita: 'it', por: 'pt', jpn: 'ja', kor: 'ko', cmn: 'zh', zho: 'zh', chi: 'zh', tur: 'tr', ara: 'ar', hin: 'hi', ind: 'id', vie: 'vi', tha: 'th', nld: 'nl', dut: 'nl' };
+  if (threeLetter[value]) return threeLetter[value];
   // YouTube uses regional codes such as en-GB or es-419; match them by the base language.
   if (/^[a-z]{2,3}-[a-z0-9]+$/.test(value)) return languageCode(value.split('-')[0]);
   return value || settings.sourceLanguage;
@@ -254,6 +329,7 @@ async function sync(enabled: boolean): Promise<void> {
         return rect.width >= 200 && rect.height >= 100 && style.display !== 'none' && style.visibility !== 'hidden';
       });
       if (videos.length) ensureNetworkProbe();
+      refreshTikTokVideos();
       const visibleSet = new Set(visibleVideos);
       overlays.forEach((overlay, video) => {
         if (!visibleSet.has(video)) {
@@ -266,6 +342,7 @@ async function sync(enabled: boolean): Promise<void> {
           const overlay = new SubtitleOverlay(video, settings);
           overlays.set(video, overlay);
           if (currentExternalCues.length) overlay.setExternalCues(currentExternalCues);
+          if (isTikTok()) void showTikTokSubtitles(video, overlay);
           if (currentLiveCue ?? currentFallbackCue) overlay.setFallbackCue(currentLiveCue ?? currentFallbackCue);
         }
       });
@@ -286,6 +363,10 @@ void getSettings().then(async (loaded) => {
   installSubtitleTextFallback();
   await sync(settings.enabled);
   await scanInlinePlayerConfiguration();
+  if (isTikTok()) {
+    readTikTokPageData();
+    ensureNetworkProbe();
+  }
   if (/(^|\.)youtube\.com$/.test(location.hostname) || document.querySelector('video')) ensureNetworkProbe();
 });
 
@@ -320,6 +401,7 @@ chrome.runtime.onMessage.addListener((message) => {
       scheduleTrackPreload(currentExternalCues, activeSubtitleSourceUrl || location.href);
     }
     overlays.forEach((overlay) => overlay.updateSettings(settings));
+    refreshTikTokVideos();
   });
   return undefined;
 });
@@ -336,6 +418,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
         if (selected) void loadSubtitle(selected);
         else clearExternalSubtitles();
       }
+      if (changes.sourceLanguage || changes.targetLanguage) refreshTikTokVideos();
       if ((changes.preloadSubtitleTrack || changes.targetLanguage || changes.translationProvider) && settings.preloadSubtitleTrack && currentExternalCues.length) {
         scheduleTrackPreload(currentExternalCues, activeSubtitleSourceUrl || location.href);
       }

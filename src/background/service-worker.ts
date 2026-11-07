@@ -98,6 +98,24 @@ function groqReasoningConfig(model: string): Record<string, unknown> {
   return model.startsWith('openai/gpt-oss') ? { reasoning_effort: 'low', include_reasoning: false } : {};
 }
 
+/**
+ * Models read a bare code like "uk" ambiguously (it is also the United Kingdom) and sometimes answer
+ * in Russian, so prompts name the language in full: "Ukrainian (uk)".
+ */
+function languageName(code: string): string {
+  const normalized = code.trim().toLocaleLowerCase().split(/[-_]/)[0];
+  const alias: Record<string, string> = { ua: 'uk', ukr: 'uk', eng: 'en', rus: 'ru' };
+  const base = alias[normalized] ?? normalized;
+  try {
+    const name = new Intl.DisplayNames(['en'], { type: 'language' }).of(base);
+    if (name && name.toLocaleLowerCase() !== base) return `${name} (${base})`;
+  } catch { /* Unknown code: use it as it is. */ }
+  return code;
+}
+
+/** Subtitles are spoken dialogue: slang and street jargon must keep their meaning and register. */
+const SLANG_RULE = 'This is spoken film dialogue. Translate slang, street and drug jargon, and profanity by their meaning with a natural equivalent of the same register (for example, drugs that are "stepped on" are diluted); do not translate them literally and do not soften them.';
+
 const wordInsightControllers = new Map<string, AbortController>();
 const groqJsonModeSupport = new Map<string, boolean>();
 let liveTranscriptionTabId: number | undefined;
@@ -323,9 +341,11 @@ async function translateRemotely(
     return data.translatedText;
   }
   const prompt = [
-    `Translate the following ${sourceLanguage} subtitle into ${targetLanguage}.`,
+    `Translate the following ${languageName(sourceLanguage)} subtitle into ${languageName(targetLanguage)}.`,
     ...(context ? [`Neighboring subtitle context (use only for disambiguation): ${JSON.stringify(context)}`] : []),
     'Translate the meaning in context, including direction, WH-words, negation, idioms, and sentence fragments that complete the preceding thought.',
+    SLANG_RULE,
+    `Write the answer in ${languageName(targetLanguage)} only.`,
     'Return only a concise natural subtitle translation, with no quotes, explanation, or labels.',
     text
   ].join('\n');
@@ -393,7 +413,9 @@ async function createWordInsight(
 ): Promise<WordInsight> {
   const dictionaryPromise = lookupEnglishWordFast(word.toLocaleLowerCase(), sourceLanguage.toLocaleLowerCase(), signal);
   const prompt = [
-    `Create language-learning data for the highlighted ${sourceLanguage} word "${word}" and translate it into ${targetLanguage}.`,
+    `Create language-learning data for the highlighted ${languageName(sourceLanguage)} word "${word}" and translate it into ${languageName(targetLanguage)}.`,
+    `Every translation field (wordTranslation, exampleTranslation, contextTranslation) must be written in ${languageName(targetLanguage)}, never in another language.`,
+    SLANG_RULE,
     `Subtitle sentence: ${JSON.stringify(context)}`,
     ...(surrounding && surrounding !== context ? [`Neighbouring subtitle lines (only to understand the meaning): ${JSON.stringify(surrounding)}`] : []),
     'Determine the exact meaning, part of speech, tense, and idiomatic use of the highlighted word in this context before answering.',
