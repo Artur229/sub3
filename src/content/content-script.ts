@@ -319,6 +319,11 @@ function installSubtitleTextFallback(): void {
   });
 }
 
+/** Muted hover previews on YouTube's home page and search results play in their own small player, not the watched video. */
+function isYouTubePreview(video: HTMLVideoElement): boolean {
+  return /(^|\.)youtube\.com$/.test(location.hostname) && Boolean(video.closest('#inline-preview-player, #inline-player, ytd-video-preview'));
+}
+
 async function sync(enabled: boolean): Promise<void> {
   if (enabled && !detector) {
     detector = new VideoDetector((videos) => {
@@ -326,7 +331,7 @@ async function sync(enabled: boolean): Promise<void> {
       const visibleVideos = Array.from(document.querySelectorAll<HTMLVideoElement>('video')).filter((video) => {
         const rect = video.getBoundingClientRect();
         const style = getComputedStyle(video);
-        return rect.width >= 200 && rect.height >= 100 && style.display !== 'none' && style.visibility !== 'hidden';
+        return rect.width >= 200 && rect.height >= 100 && style.display !== 'none' && style.visibility !== 'hidden' && !isYouTubePreview(video);
       });
       if (videos.length) ensureNetworkProbe();
       refreshTikTokVideos();
